@@ -157,6 +157,8 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	n = NENV * sizeof(struct Env);
+	envs = (struct Env *) boot_alloc(n);
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -180,7 +182,7 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
-	n = ROUNDUP(n, PGSIZE);
+	n = ROUNDUP(npages * sizeof(struct PageInfo), PGSIZE);
 	boot_map_region(kern_pgdir, UPAGES, n, PADDR(pages), PTE_U | PTE_P);
 	page_insert(kern_pgdir, pages, (void *)pages, PTE_W);
 
@@ -191,6 +193,9 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	n = ROUNDUP(NENV * sizeof(struct Env), PGSIZE);
+	boot_map_region(kern_pgdir, UENVS, n, PADDR(envs), PTE_U | PTE_P);
+	page_insert(kern_pgdir, pa2page(PADDR(envs)), (void *)envs, PTE_W);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -528,6 +533,27 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	uintptr_t sa, ea;
+	struct PageInfo *pp;
+	pte_t *pte;
+	sa = (uintptr_t)ROUNDDOWN(va, PGSIZE);
+	ea = (uintptr_t)ROUNDUP((uintptr_t)va + len, PGSIZE);
+	perm |= PTE_P;
+
+	for (; sa < ea; sa += PGSIZE) {
+		pp = page_lookup(env->env_pgdir, (void *)sa, &pte);
+		if (sa < ULIM && pp && (*pte & perm) == perm) {
+			continue;
+		}
+
+		if (sa <= (uintptr_t)va) {
+			user_mem_check_addr = (uintptr_t)va;
+		} else {
+			user_mem_check_addr = sa;
+		}
+
+		return -E_FAULT;
+	}
 
 	return 0;
 }
@@ -542,7 +568,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 void
 user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 {
-	if (user_mem_check(env, va, len, perm | PTE_U) < 0) {
+	if (user_mem_check(env, va, len, perm | PTE_U | PTE_P) < 0) {
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", env->env_id, user_mem_check_addr);
 		env_destroy(env);	// may not return
