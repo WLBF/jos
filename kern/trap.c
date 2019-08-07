@@ -69,9 +69,17 @@ static const char *trapname(int trapno)
 void
 trap_init(void)
 {
+	int i;
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	extern void* traphandlertbl[];
+
+	for (i = 0; i < 48; i++) {
+		SETGATE(idt[i], 1, GD_KT, traphandlertbl[i], 0);
+	}
+	SETGATE(idt[3], 1, GD_KT, traphandlertbl[3], 3);
+	SETGATE(idt[48], 1, GD_KT, traphandlertbl[48], 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -176,6 +184,23 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	switch (tf->tf_trapno) {
+	case T_PGFLT:
+		page_fault_handler(tf);
+		return;
+	case T_BRKPT:
+		monitor(tf);
+		return;
+	case T_SYSCALL:
+		tf->tf_regs.reg_eax = syscall(
+			tf->tf_regs.reg_eax,
+			tf->tf_regs.reg_edx,
+			tf->tf_regs.reg_ecx,
+			tf->tf_regs.reg_ebx,
+			tf->tf_regs.reg_edi,
+			tf->tf_regs.reg_esi);
+		return;
+	}
 
 	// Handle spurious interrupts
 	// The hardware sometimes raises these because of noise on the
@@ -271,6 +296,9 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
+	if (tf->tf_cs == GD_KT) {
+		panic("page fault in kernel");
+	}
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
