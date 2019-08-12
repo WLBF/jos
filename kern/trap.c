@@ -287,6 +287,9 @@ void
 page_fault_handler(struct Trapframe *tf)
 {
 	uint32_t fault_va;
+	char *uxstktop;
+	size_t sz;
+	struct UTrapframe *utf;
 
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
@@ -332,6 +335,30 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+	if (curenv->env_pgfault_upcall != NULL) {
+		if (tf->tf_esp >= UXSTACKTOP - PGSIZE && tf->tf_esp < UXSTACKTOP) {
+			uxstktop = (char *)tf->tf_esp;
+			sz = sizeof(struct UTrapframe) + 4;
+		} else {
+			uxstktop = (char *)UXSTACKTOP;
+			sz = sizeof(struct UTrapframe);
+		}
+
+		user_mem_assert(curenv, uxstktop - sz, sz, PTE_U | PTE_W);
+
+		utf = (struct UTrapframe *)(uxstktop - sz);
+
+		utf->utf_fault_va = fault_va;
+		utf->utf_eip = tf->tf_eip;
+		utf->utf_esp = tf->tf_esp;
+		utf->utf_eflags = tf->tf_eflags;
+		utf->utf_regs = tf->tf_regs;
+		utf->utf_err = tf->tf_err;
+
+		curenv->env_tf.tf_eip = (uintptr_t)curenv->env_pgfault_upcall;
+		curenv->env_tf.tf_esp = (uintptr_t)utf;
+		env_run(curenv);
+	}
 
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",

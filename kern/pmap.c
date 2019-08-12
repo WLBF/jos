@@ -628,6 +628,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	pte_t *pte;
 	sa = (uintptr_t)ROUNDDOWN(va, PGSIZE);
 	ea = (uintptr_t)ROUNDUP((uintptr_t)va + len, PGSIZE);
+	perm |= PTE_P;
 
 	for (; sa < ea; sa += PGSIZE) {
 		pp = page_lookup(env->env_pgdir, (void *)sa, &pte);
@@ -657,7 +658,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 void
 user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 {
-	if (user_mem_check(env, va, len, perm | PTE_U) < 0) {
+	if (user_mem_check(env, va, len, perm | PTE_U | PTE_P) < 0) {
 		cprintf("[%08x] user_mem_check assertion failure for "
 			"va %08x\n", env->env_id, user_mem_check_addr);
 		env_destroy(env);	// may not return
