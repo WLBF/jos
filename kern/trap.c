@@ -75,11 +75,12 @@ trap_init(void)
 	// LAB 3: Your code here.
 	extern void* traphandlertbl[];
 
-	for (i = 0; i < 48; i++) {
-		SETGATE(idt[i], 1, GD_KT, traphandlertbl[i], 0);
+	for (i = 0; i < 256; i++) {
+		SETGATE(idt[i], 0, GD_KT, traphandlertbl[i], 0);
 	}
-	SETGATE(idt[3], 1, GD_KT, traphandlertbl[3], 3);
-	SETGATE(idt[48], 1, GD_KT, traphandlertbl[48], 3);
+
+	SETGATE(idt[T_BRKPT], 0, GD_KT, traphandlertbl[T_BRKPT], 3);
+	SETGATE(idt[T_SYSCALL], 0, GD_KT, traphandlertbl[T_SYSCALL], 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -212,6 +213,11 @@ trap_dispatch(struct Trapframe *tf)
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
 
+	if (tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER) {
+		lapic_eoi();
+		sched_yield();
+	}
+
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -287,7 +293,7 @@ void
 page_fault_handler(struct Trapframe *tf)
 {
 	uint32_t fault_va;
-	char *uxstktop;
+	char *stktop;
 	size_t sz;
 	struct UTrapframe *utf;
 
@@ -337,16 +343,16 @@ page_fault_handler(struct Trapframe *tf)
 	// LAB 4: Your code here.
 	if (curenv->env_pgfault_upcall != NULL) {
 		if (tf->tf_esp >= UXSTACKTOP - PGSIZE && tf->tf_esp < UXSTACKTOP) {
-			uxstktop = (char *)tf->tf_esp;
+			stktop = (char *)tf->tf_esp;
 			sz = sizeof(struct UTrapframe) + 4;
 		} else {
-			uxstktop = (char *)UXSTACKTOP;
+			stktop = (char *)UXSTACKTOP;
 			sz = sizeof(struct UTrapframe);
 		}
 
-		user_mem_assert(curenv, uxstktop - sz, sz, PTE_U | PTE_W);
+		user_mem_assert(curenv, stktop - sz, sz, PTE_U | PTE_W);
 
-		utf = (struct UTrapframe *)(uxstktop - sz);
+		utf = (struct UTrapframe *)(stktop - sz);
 
 		utf->utf_fault_va = fault_va;
 		utf->utf_eip = tf->tf_eip;

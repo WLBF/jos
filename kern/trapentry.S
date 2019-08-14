@@ -167,10 +167,3 @@ _alltraps:
 	pushl %esp
 
 	call trap
-
-	popl %esp
-
-	popal
-
-	popl %ds
-	popl %es

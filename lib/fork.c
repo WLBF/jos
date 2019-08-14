@@ -17,6 +17,7 @@ pgfault(struct UTrapframe *utf)
 	void *addr = (void *) utf->utf_fault_va;
 	uint32_t err = utf->utf_err;
 	int r;
+	uint32_t perm = PTE_P | PTE_U | PTE_COW;
 
 	// Check that the faulting access was (1) a write, and (2) to a
 	// copy-on-write page.  If not, panic.
@@ -25,7 +26,7 @@ pgfault(struct UTrapframe *utf)
 	//   (see <inc/memlayout.h>).
 
 	// LAB 4: Your code here.
-	if (!(utf->utf_err & FEC_WR) || !(uvpt[PGNUM(addr)] & PTE_COW)) {
+	if (!(utf->utf_err & FEC_WR) || (uvpt[PGNUM(addr)] & perm) != perm) {
 		panic("pgfault: not write access or not COW page");
 	}
 
@@ -65,23 +66,22 @@ duppage(envid_t envid, unsigned pn)
 {
 	int r;
 	void *addr = (void *)(pn * PGSIZE);
-	int perm = PTE_U | PTE_P;
+	uint32_t perm;
 
-	// LAB 4: Your code here.
-	if (uvpt[pn] & (PTE_W | perm) || uvpt[pn] & (PTE_COW | perm)) {
+	perm = PTE_U | PTE_P;
 
-		if ((r = sys_page_map(0, addr, envid, addr, perm | PTE_COW)) != 0)
-			panic("sys_page_map: %e", r);
-
-		if ((r = sys_page_map(0, addr, 0, addr, perm | PTE_COW)) != 0)
-			panic("sys_page_map: %e", r);
-
-	} else if (uvpt[pn] & perm) {
-
-		if ((r = sys_page_map(thisenv->env_id, addr, envid, addr, perm)) != 0)
-			panic("sys_page_map: %e", r);
-	}
-
+	if (uvpt[pn] & (PTE_W | PTE_COW)) 
+		perm |= PTE_COW;
+	
+	if ((r = sys_page_map(0, addr, envid, addr, perm)) < 0)
+		panic("sys_page_map: %e", r);
+	
+	if (!(perm & PTE_COW))
+		return 0;
+	
+	if ((r = sys_page_map(0, addr, 0, addr, perm)) < 0)
+		panic("sys_page_map: %e", r);
+	
 	return 0;
 }
 
@@ -120,16 +120,14 @@ fork(void)
 		return 0;
 	}
 
-	for (va = 0; va < (uint8_t *)USTACKTOP; va += PGSIZE) {	
+	for (va = 0; va < (uint8_t *)USTACKTOP; va += PGSIZE)
 		if ((uvpd[PDX(va)] & PTE_P) && (uvpt[PGNUM(va)] & PTE_P))
 			duppage(envid, PGNUM(va));
-	}
 
 	if ((r = sys_page_alloc(envid, (void *)(UXSTACKTOP - PGSIZE), PTE_U | PTE_P | PTE_W)) < 0)
 		panic("allocating at %x in pgfault: %e", PFTEMP, r);
 
-	if ((r = sys_env_set_pgfault_upcall(envid, thisenv->env_pgfault_upcall
-	)) < 0)
+	if ((r = sys_env_set_pgfault_upcall(envid, thisenv->env_pgfault_upcall)) < 0)
 		panic("sys_env_set_pgfault_upcall: %e", r);
 
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
