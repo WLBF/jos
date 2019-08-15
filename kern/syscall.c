@@ -354,8 +354,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		return -E_INVAL;
 	}
 
-	if ((uintptr_t)srcva < UTOP &&
-		((perm & (PTE_U | PTE_P)) != (PTE_U | PTE_P) || (perm | PTE_SYSCALL) != PTE_SYSCALL)) {
+	if ((uintptr_t)srcva < UTOP && (perm | PTE_SYSCALL) != PTE_SYSCALL) {
 		return -E_INVAL;
 	}
 
@@ -367,7 +366,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		return -E_INVAL;
 	}
 
-	if (send && page_insert(e->env_pgdir, pp, srcva, perm) < 0) {
+	if (send && page_insert(e->env_pgdir, pp, e->env_ipc_dstva , perm) < 0) {
 		return -E_NO_MEM;
 	}
 

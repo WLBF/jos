@@ -27,7 +27,7 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 	if (!(utf->utf_err & FEC_WR) || (uvpt[PGNUM(addr)] & perm) != perm) {
-		panic("pgfault: not write access or not COW page");
+		panic("pgfault pte: %08x, addr: %08x", uvpt[PGNUM(addr)], addr);
 	}
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
