@@ -362,20 +362,23 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 
 	send = (uintptr_t)srcva < UTOP && (uintptr_t)e->env_ipc_dstva < UTOP;
 
-	if ((uintptr_t)srcva < UTOP && ROUNDUP(srcva, PGSIZE) != srcva) {
-		return -E_INVAL;
-	}
+	if ((uintptr_t)srcva < UTOP) {
 
-	if ((uintptr_t)srcva < UTOP && (perm | PTE_SYSCALL) != PTE_SYSCALL) {
-		return -E_INVAL;
-	}
+		if (ROUNDUP(srcva, PGSIZE) != srcva) {
+			return -E_INVAL;
+		}
 
-	if ((uintptr_t)srcva < UTOP && !(pp = page_lookup(curenv->env_pgdir, srcva, &pte))) {
-		return -E_INVAL;
-	}
+		if ((perm | PTE_SYSCALL) != PTE_SYSCALL) {
+			return -E_INVAL;
+		}
 
-	if ((perm & PTE_W) && !(*pte & PTE_W)) {
-		return -E_INVAL;
+		if (!(pp = page_lookup(curenv->env_pgdir, srcva, &pte))) {
+			return -E_INVAL;
+		}
+
+		if ((perm & PTE_W) && !(*pte & PTE_W)) {
+			return -E_INVAL;
+		}
 	}
 
 	if (send && page_insert(e->env_pgdir, pp, e->env_ipc_dstva , perm) < 0) {
