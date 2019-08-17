@@ -67,21 +67,29 @@ duppage(envid_t envid, unsigned pn)
 	int r;
 	void *addr = (void *)(pn * PGSIZE);
 	uint32_t perm;
+	pte_t pte;
 
+	pte = uvpt[pn];
 	perm = PTE_U | PTE_P;
 
-	if (uvpt[pn] & (PTE_W | PTE_COW)) 
+	if (pte & (PTE_W | PTE_COW))
 		perm |= PTE_COW;
 	
+	// If PTE_SHARE is set, then map with the same pte perm.
+	if (pte & PTE_SHARE)
+		perm = pte & PTE_SYSCALL;
+
 	if ((r = sys_page_map(0, addr, envid, addr, perm)) < 0)
 		panic("sys_page_map: %e", r);
-	
-	if (!(perm & PTE_COW))
-		return 0;
-	
-	if ((r = sys_page_map(0, addr, 0, addr, perm)) < 0)
-		panic("sys_page_map: %e", r);
-	
+
+	// We need to mark ours copy-on-write again, because we need to remove PTE_W
+	// flag from original mapping to make sure the wirte access will trigger
+	// the general protection page fault.
+	if (perm & PTE_COW) {
+		if ((r = sys_page_map(0, addr, 0, addr, perm)) < 0)
+			panic("sys_page_map: %e", r);
+	}
+
 	return 0;
 }
 
