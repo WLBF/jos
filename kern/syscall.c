@@ -12,6 +12,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/time.h>
+#include <kern/e1000.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -425,7 +426,6 @@ sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
 	envid_t envid;
-	struct Ev *e;
 
 	if ((uintptr_t)dstva < UTOP && ROUNDUP(dstva, PGSIZE) != dstva) {
 		return -E_INVAL;
@@ -444,6 +444,13 @@ sys_time_msec(void)
 {
 	// LAB 6: Your code here.
 	return time_msec();
+}
+
+static int
+sys_ns_send_packet(envid_t envid, void* va, size_t len)
+{
+	user_mem_assert(curenv, va, len, PTE_U | PTE_P);
+	return e1000_transmit(va, len);
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -486,6 +493,8 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		return sys_env_set_trapframe(a1, (void *)a2);
 	case SYS_time_msec:
 		return sys_time_msec();
+	case SYS_ns_send_packet:
+		return sys_ns_send_packet(a1, (void *)a2, a3);
 	default:
 		return -E_INVAL;
 	}

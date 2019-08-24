@@ -122,3 +122,9 @@ sys_time_msec(void)
 {
 	return (unsigned int) syscall(SYS_time_msec, 0, 0, 0, 0, 0, 0);
 }
+
+int
+sys_ns_send_packet(envid_t envid, void *va, size_t len)
+{
+	return syscall(SYS_ns_send_packet, 1, envid, (uint32_t)va, len, 0, 0);
+}
