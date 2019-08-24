@@ -8,7 +8,7 @@
 #define N_TX_DESC      0x40
 #define TX_DESC_SIZE   0x10
 #define TX_RING_SIZE   N_TX_DESC * TX_DESC_SIZE
-#define BUF_MAX_SIZE   PGSIZE - 8
+#define TX_BUFSIZE     0x1000
 
 #define E1000_VENDOR_ID         0x8086
 #define E1000_DEV_ID_82540EM    0x100E
@@ -43,5 +43,46 @@ struct tx_desc
 	uint16_t special;
 } __attribute__ ((packed));
 
+#define N_RX_DESC      0x80
+#define RX_DESC_SIZE   0x10
+#define RX_RING_SIZE   N_RX_DESC * RX_DESC_SIZE
+#define RX_BUFSIZE     0x800
+
+#define E1000_RDBAL    0x02800  /* RX Descriptor Base Address Low - RW */
+#define E1000_RDBAH    0x02804  /* RX Descriptor Base Address High - RW */
+#define E1000_RDLEN    0x02808  /* RX Descriptor Length - RW */
+#define E1000_RDH      0x02810  /* RX Descriptor Head - RW */
+#define E1000_RDT      0x02818  /* RX Descriptor Tail - RW */
+#define E1000_MTA      0x05200  /* Multicast Table Array - RW Array */
+#define E1000_RAL      0x05400  /* Receive Address - RW Array */
+#define E1000_RAH      0x05404  /* Receive Address - RW Array */
+#define E1000_RCTL     0x00100  /* RX Control - RW */
+
+/* Receive Address */
+#define E1000_RAH_AV  0x80000000        /* Receive descriptor valid */
+
+/* Receive Control */
+#define E1000_RCTL_EN             0x00000002    /* enable */
+#define E1000_RCTL_SBP            0x00000004    /* store bad packet */
+#define E1000_RCTL_LPE            0x00000020    /* long packet enable */
+#define E1000_RCTL_LBM_NO         0x00000000    /* no loopback mode */
+#define E1000_RCTL_SZ_2048        0x00000000    /* rx buffer size 2048 */
+#define E1000_RCTL_SECRC          0x04000000    /* Strip Ethernet CRC */
+#define E1000_RCTL_BAM            0x00008000    /* broadcast enable */
+
+/* Receive Descriptor bit definitions */
+#define E1000_RXD_STAT_DD       0x01    /* Descriptor Done */
+#define E1000_RXD_STAT_EOP      0x02    /* End of Packet */
+
+struct rx_desc {
+    uint64_t addr;
+    uint16_t length;
+    uint16_t csum;
+    uint8_t status;
+    uint8_t errors;
+    uint16_t special;
+} __attribute__ ((packed));
+
 int e1000_init(struct pci_func *f);
-int e1000_transmit(void *addr, size_t len);
+int e1000_transmit(void *va, size_t len);
+int e1000_receive(void *va, size_t len);

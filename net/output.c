@@ -22,7 +22,7 @@ output(envid_t ns_envid)
 			continue;
 		}
 
-		while(sys_ns_send_packet(0, nsipcbuf.pkt.jp_data, nsipcbuf.pkt.jp_len) < 0)
+		while(sys_ns_send(nsipcbuf.pkt.jp_data, nsipcbuf.pkt.jp_len) < 0)
 			sys_yield();
 	}
 }

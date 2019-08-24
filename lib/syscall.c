@@ -124,7 +124,13 @@ sys_time_msec(void)
 }
 
 int
-sys_ns_send_packet(envid_t envid, void *va, size_t len)
+sys_ns_send(void *va, size_t len)
 {
-	return syscall(SYS_ns_send_packet, 1, envid, (uint32_t)va, len, 0, 0);
+	return syscall(SYS_ns_send, 1, (uint32_t)va, len, 0, 0, 0);
+}
+
+int
+sys_ns_recv(void *va, size_t len)
+{
+	return syscall(SYS_ns_recv, 0, (uint32_t)va, len, 0, 0, 0);
 }

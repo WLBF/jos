@@ -447,10 +447,17 @@ sys_time_msec(void)
 }
 
 static int
-sys_ns_send_packet(envid_t envid, void* va, size_t len)
+sys_ns_send(void* va, size_t len)
 {
 	user_mem_assert(curenv, va, len, PTE_U | PTE_P);
 	return e1000_transmit(va, len);
+}
+
+static int
+sys_ns_recv(void* va, size_t len)
+{
+	user_mem_assert(curenv, va, len, PTE_U | PTE_P | PTE_W);
+	return e1000_receive(va, len);
 }
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -493,8 +500,10 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 		return sys_env_set_trapframe(a1, (void *)a2);
 	case SYS_time_msec:
 		return sys_time_msec();
-	case SYS_ns_send_packet:
-		return sys_ns_send_packet(a1, (void *)a2, a3);
+	case SYS_ns_send:
+		return sys_ns_send((void *)a1, a2);
+	case SYS_ns_recv:
+		return sys_ns_recv((void *)a1, a2);
 	default:
 		return -E_INVAL;
 	}
